@@ -25,15 +25,15 @@ void setup() {
     pinMode(PRESET1_PIN, INPUT_PULLUP);
     pinMode(PRESET2_PIN, INPUT_PULLUP);
     pinMode(PRESET3_PIN, INPUT_PULLUP);
-    pinMode(SSR_OFF_PIN, OUTPUT);
+  
 
     // АППАРАТНЫЕ УЛУЧШЕНИЯ ДЛЯ СКОРОСТИ
     analogReadResolution(12);
     analogWrite(FAN_PWM_PIN, 0);        // Инициализировать ШИМ на нужном пине
     analogWriteFrequency(25000);        // Установить частоту (применится к последнему использованному таймеру)
 
-    digitalWrite(SSR_OFF_PIN, HIGH);
-    
+   // Инициализация состояния геркона
+
     // Прерывания
     attachInterrupt(digitalPinToInterrupt(ENCODER_A_PIN), encoderISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_B_PIN), encoderISR, CHANGE);
@@ -41,7 +41,8 @@ void setup() {
 
     // Nextion
     Serial1.begin(9600);
-
+  
+    
     // Хранилище
     storageSetup();
 
@@ -51,6 +52,10 @@ void setup() {
     digitalWrite(POWER_LED_PIN, LOW);
     digitalWrite(BUZZER_PIN, LOW);
     lastActivity = millis();
+    gerkonRaw = digitalRead(GERKON_PIN);
+    gerkonDebounced = gerkonRaw;
+    gerkonPending = false;
+    handToolInHand = gerkonDebounced;
 }
 
 void loop() {
@@ -103,20 +108,6 @@ void loop() {
         digitalWrite(POWER_LED_PIN, LOW);
     }
 
-    // АВТООТКЛЮЧЕНИЕ
-    if (powerOn && !handToolInHand &&
-        (now - lastActivity > (uint32_t)AUTO_SHUTDOWN_MIN * 60000UL)) {
-        powerOn = false;
-        beep(600, 200);
-        menu = 0;
-        presetEditMode = false;
-        activePreset = -1;
-        updateHeater(0);
-        analogWrite(FAN_PWM_PIN, 0);
-        digitalWrite(POWER_LED_PIN, LOW);
-        saveSettings();
-    }
-
     // ДИСПЛЕЙ (5 Гц - чтобы не нагружать)
     static uint32_t lastDisplay = 0;
     if (now - lastDisplay > 200) {
@@ -126,3 +117,5 @@ void loop() {
 
     delay(5); // Минимальная задержка для стабильности
 }
+
+

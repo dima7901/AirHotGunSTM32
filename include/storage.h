@@ -1,11 +1,12 @@
 #ifndef STORAGE_H
 #define STORAGE_H
 
-#include "globals.h"
+#include <Arduino.h>
+#include <EEPROM.h>
 
 void storageSetup();
-bool saveSettings();
-bool loadSettings();
+bool savePresets();  // Сохраняет только пресеты
+bool loadPresets();  // Загружает только пресеты
 void resetToDefaults();
 
 #endif

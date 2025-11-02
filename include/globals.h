@@ -7,12 +7,12 @@
 #define ADC_TEMP_PIN        PA0
 #define ZERO_CROSS_PIN      PA1
 #define HEATER_PIN          PA2
-#define POWER_BTN_PIN       PA4
-#define GERKON_PIN          PA5
+#define POWER_BTN_PIN       PA5
+#define GERKON_PIN          PB15
 #define ENCODER_A_PIN       PA6
 #define ENCODER_B_PIN       PA7
 #define FAN_PWM_PIN         PA8
-#define SSR_OFF_PIN         PC14
+
 
 #define ENCODER_SW_PIN      PB0
 #define POWER_LED_PIN       PB1
@@ -48,6 +48,11 @@ extern int16_t currentTemp;
 extern int16_t setTemp;
 extern int16_t rawAdc;
 extern uint8_t fanPercent;
+
+extern bool gerkonDebounced;      
+extern bool gerkonRaw;            
+extern bool gerkonPending;        
+extern uint32_t gerkonDebounceTime;
 
 struct Preset {
     int16_t temp;

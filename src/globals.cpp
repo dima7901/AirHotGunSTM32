@@ -10,6 +10,11 @@ int16_t setTemp = 250;
 int16_t rawAdc = 0;
 uint8_t fanPercent = 60;
 
+bool gerkonRaw = false;
+bool gerkonDebounced = false;
+bool gerkonPending = false;
+uint32_t gerkonDebounceTime = 0;
+
 Preset presets[NUM_PRESETS] = {
     {250, 60},
     {300, 75},
