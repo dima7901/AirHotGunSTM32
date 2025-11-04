@@ -4,6 +4,7 @@
 #include "nextion.h"
 #include "storage.h"
 #include "control.h"
+#include <EEPROM.h>
 
 void setup() {
     // Инициализация пинов
@@ -45,6 +46,7 @@ void setup() {
     
     // Хранилище
     storageSetup();
+    loadPresets();
 
     // Инициализация
     digitalWrite(HEATER_PIN, LOW);
@@ -70,7 +72,7 @@ void loop() {
 
     // БЫСТРОЕ УПРАВЛЕНИЕ КНОПКАМИ (50 Гц)
     static uint32_t lastControlUpdate = 0;
-    if (now - lastControlUpdate > 20) {
+    if (now - lastControlUpdate > 10) {
         handleGercon();
         handlePowerButton();
         handleTempButtons();
@@ -78,6 +80,7 @@ void loop() {
         handleEncoder();
         handleEncoderButton();
         handlePresets();
+        checkAutoPowerOff();
         lastControlUpdate = now;
     }
 
@@ -93,6 +96,7 @@ void loop() {
     if (now - lastPeripheralUpdate > 50) {
         updateFan();
         updatePowerLED();
+        checkCoolingMode();
         lastPeripheralUpdate = now;
     }
 
@@ -108,6 +112,18 @@ void loop() {
         digitalWrite(POWER_LED_PIN, LOW);
     }
 
+    // АВАРИЙНАЯ ЗАЩИТА ОТ ПЕРЕГРЕВА (>530°C)
+if (currentTemp > HOT_CUTOFF) {
+    powerOn = false;
+    updateHeater(0);
+    analogWrite(FAN_PWM_PIN, 255); // продувка до остывания
+    digitalWrite(POWER_LED_PIN, LOW);
+    beep(400, 200);
+    delay(250);
+    beep(400, 200);
+    // Сохранять настройки НЕ нужно — это авария
+}
+
     // ДИСПЛЕЙ (5 Гц - чтобы не нагружать)
     static uint32_t lastDisplay = 0;
     if (now - lastDisplay > 200) {
@@ -117,5 +133,3 @@ void loop() {
 
     delay(5); // Минимальная задержка для стабильности
 }
-
-

@@ -29,17 +29,17 @@
 #define MIN_TEMP            20
 #define MAX_TEMP            500
 #define MIN_SET_TEMP        100
-#define HOT_CUTOFF          44
+#define HOT_CUTOFF          530
+#define COOLING_TEMP        80
 #define MAX_ADC_VAL         4095
 #define MAX_SAFE_ADC        4000
 #define NUM_PRESETS         3
 #define HOLD_TIME_SHORT_MS  500
 #define HOLD_TIME_LONG_MS   1000
 #define AUTO_SHUTDOWN_MIN   10
-#define BUTTON_REPEAT_DELAY 300
-#define BUTTON_ACCELERATE   50
 
 // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+extern const char* FirmwareVersion;
 extern bool powerOn;
 extern bool handToolInHand;
 extern uint32_t lastActivity;
@@ -53,6 +53,9 @@ extern bool gerkonDebounced;
 extern bool gerkonRaw;            
 extern bool gerkonPending;        
 extern uint32_t gerkonDebounceTime;
+extern bool heaterHasBeenActiveSinceShutdown;
+extern bool coolingCompleted;
+extern bool hasCooledBelowThreshold;
 
 struct Preset {
     int16_t temp;

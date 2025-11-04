@@ -7,7 +7,6 @@
 bool powerButtonState = true;
 bool lastHandToolState = true;
 bool coolingMode = false;
-bool fanWasActive = false;
 const uint32_t AUTO_POWER_OFF_TIME = 10 * 60 * 1000; // 10 минут в миллисекундах
 
 void beep(uint16_t freq, uint16_t duration) {
@@ -20,7 +19,7 @@ void checkAutoPowerOff() {
         if (now - lastActivity > (uint32_t)AUTO_SHUTDOWN_MIN * 60000UL) {
             powerOn = false;
             coolingMode = false;
-            fanWasActive = false;
+           
             menu = 0;
             presetEditMode = false;
             activePreset = -1;
@@ -52,11 +51,9 @@ void updateHeater(uint8_t output) {
 }
 
 void updateHeaterLogic() {
-    // ЖЕЛЕЗОБЕТОННОЕ ПРАВИЛО: нагрев ВКЛЮЧЕН только когда станция ВКЛ и фен В РУКАХ
     if (powerOn && handToolInHand) {
-        // ВКЛЮЧАЕМ НАГРЕВ - сбрасываем флаг охлаждения
-        fanWasActive = false;
-        
+        coolingCompleted = false;                 // <<< СБРОС: начался новый цикл нагрева
+        heaterHasBeenActiveSinceShutdown = true;  // как было
         int16_t error = setTemp - currentTemp;
         if (error > 150) {
             updateHeater(255);
@@ -68,39 +65,44 @@ void updateHeaterLogic() {
             updateHeater(constrain(heaterOutput, 0, 200));
         }
     } else {
-        // Нагрев ВЫКЛЮЧЕН когда на подставке или станция ВЫКЛ
         updateHeater(0);
     }
 }
 
 void updateFan() {
+    // Режим активного охлаждения (после выключения по кнопке POWER)
     if (coolingMode) {
-        // Режим охлаждения перед выключением - 100%
         analogWrite(FAN_PWM_PIN, 255);
-        fanWasActive = true;
-    } else if (powerOn && handToolInHand) {
-        // Рабочий режим - ВСЕГДА работает по установленной скорости
+        return;
+    }
+
+    // Рабочий режим: станция включена и фен в руках
+    if (powerOn && handToolInHand) {
+        hasCooledBelowThreshold = false; // Сброс при новом использовании
         uint8_t fanSpeed = map(constrain(fanPercent, 30, 100), 0, 100, 80, 255);
         analogWrite(FAN_PWM_PIN, fanSpeed);
-    } else if (powerOn && !handToolInHand) {
-        // Режим ожидания на подставке - охлаждение до 80°C
-        if (currentTemp > COOLING_TEMP && !fanWasActive) {
-            // Включаем охлаждение только если еще не остывали
-            analogWrite(FAN_PWM_PIN, 255);
-        } else if (currentTemp <= COOLING_TEMP) {
-            // Остыли до 80°C - выключаем вентилятор и ставим флаг
-            analogWrite(FAN_PWM_PIN, 0);
-            fanWasActive = true;
-        }
-    } else if (!powerOn && currentTemp > COOLING_TEMP) {
-        // Охлаждение после выключения
+        return;
+    }
+
+    // Станция выключена — не включаем вентилятор вообще
+    if (!powerOn) {
+        analogWrite(FAN_PWM_PIN, 0);
+        return;
+    }
+
+    // Станция включена, но фен на базе (режим паузы)
+    if (hasCooledBelowThreshold) {
+        // Уже остывали до COOLING_TEMP — больше не включаем вентилятор
+        analogWrite(FAN_PWM_PIN, 0);
+        return;
+    }
+
+    // Пока не остывали — включаем вентилятор, если горячо
+    if (currentTemp > COOLING_TEMP) {
         analogWrite(FAN_PWM_PIN, 255);
-        fanWasActive = true;
-    } else if (currentTemp > HOT_CUTOFF) {
-        // Аварийное охлаждение
-        analogWrite(FAN_PWM_PIN, 255);
-        fanWasActive = true;
     } else {
+        // Впервые достигли <= COOLING_TEMP — запоминаем навсегда
+        hasCooledBelowThreshold = true;
         analogWrite(FAN_PWM_PIN, 0);
     }
 }
@@ -126,71 +128,87 @@ void updatePowerLED() {
     }
 }
 
-// Унифицированная функция обработки удержания кнопок
 void handleButtonRepeat(uint32_t& pressStart, bool isPressed, int8_t direction,
                        int16_t& value, int16_t minVal, int16_t maxVal, int16_t step) {
-    if (!powerOn) return; // Управление заблокировано ТОЛЬКО при powerOff
-    
+    if (!powerOn) return;
     uint32_t now = millis();
     if (isPressed) {
         if (pressStart == 0) {
             pressStart = now;
             value = constrain(value + (direction * step), minVal, maxVal);
-            lastActivity = now; // Сбрасываем таймер авто-выключения
+            lastActivity = now;
             beep(1000, 50);
         } else {
             uint32_t holdTime = now - pressStart;
-            if (holdTime > BUTTON_REPEAT_DELAY) {
-                uint32_t repeatRate = BUTTON_ACCELERATE;
+            uint32_t interval = 300;  // Начальная задержка
+            
+            // АГРЕССИВНОЕ УСКОРЕНИЕ
+            if (holdTime > 400)  interval = 150;
+            if (holdTime > 600)  interval = 80;
+            if (holdTime > 800)  interval = 40;
+            if (holdTime > 1000) interval = 20;
+            if (holdTime > 1200) interval = 10;
+            if (holdTime > 1400) interval = 5;
+            if (holdTime > 1600) interval = 2;
+            if (holdTime > 1800) interval = 1;
+
+            static uint32_t lastStepTime = 0;
+            if (now - lastStepTime >= interval) {
+                // ДИНАМИЧЕСКИЙ ШАГ - увеличиваем шаг при долгом удержании
+                int16_t dynamicStep = step;
+                if (holdTime > 2000) dynamicStep = step * 2;
+                if (holdTime > 3000) dynamicStep = step * 4;
+                if (holdTime > 4000) dynamicStep = step * 8;
                 
-                // Ускорение при длительном удержании
-                if (holdTime > 2000) repeatRate = 80;
-                if (holdTime > 4000) repeatRate = 40;
-                if (holdTime > 6000) repeatRate = 20;
-                
-                if (now - lastActivity > repeatRate) {
-                    value = constrain(value + (direction * step), minVal, maxVal);
-                    lastActivity = now; // Сбрасываем таймер авто-выключения
-                }
+                value = constrain(value + (direction * dynamicStep), minVal, maxVal);
+                lastActivity = now;
+                lastStepTime = now;
             }
         }
     } else {
-        if (pressStart != 0) {
-            pressStart = 0;
-        }
+        pressStart = 0;
     }
 }
 
 void handleButtonRepeat(uint32_t& pressStart, bool isPressed, int8_t direction,
                        uint8_t& value, uint8_t minVal, uint8_t maxVal, uint8_t step) {
-    if (!powerOn) return; // Управление заблокировано ТОЛЬКО при powerOff
-    
+    if (!powerOn) return;
     uint32_t now = millis();
     if (isPressed) {
         if (pressStart == 0) {
             pressStart = now;
             value = constrain(value + (direction * step), minVal, maxVal);
-            lastActivity = now; // Сбрасываем таймер авто-выключения
+            lastActivity = now;
             beep(1000, 50);
         } else {
             uint32_t holdTime = now - pressStart;
-            if (holdTime > BUTTON_REPEAT_DELAY) {
-                uint32_t repeatRate = BUTTON_ACCELERATE;
+            uint32_t interval = 300;  // Начальная задержка
+            
+            // АГРЕССИВНОЕ УСКОРЕНИЕ
+            if (holdTime > 400)  interval = 150;
+            if (holdTime > 600)  interval = 80;
+            if (holdTime > 800)  interval = 40;
+            if (holdTime > 1000) interval = 20;
+            if (holdTime > 1200) interval = 10;
+            if (holdTime > 1400) interval = 5;
+            if (holdTime > 1600) interval = 2;
+            if (holdTime > 1800) interval = 1;
+
+            static uint32_t lastStepTime = 0;
+            if (now - lastStepTime >= interval) {
+                // ДИНАМИЧЕСКИЙ ШАГ
+                uint8_t dynamicStep = step;
+                if (holdTime > 2000) dynamicStep = step * 2;
+                if (holdTime > 3000) dynamicStep = step * 3;
+                if (holdTime > 4000) dynamicStep = step * 5;
                 
-                if (holdTime > 2000) repeatRate = 80;
-                if (holdTime > 4000) repeatRate = 40;
-                if (holdTime > 6000) repeatRate = 20;
-                
-                if (now - lastActivity > repeatRate) {
-                    value = constrain(value + (direction * step), minVal, maxVal);
-                    lastActivity = now; // Сбрасываем таймер авто-выключения
-                }
+                value = constrain(value + (direction * dynamicStep), minVal, maxVal);
+                lastActivity = now;
+                lastStepTime = now;
             }
         }
     } else {
-        if (pressStart != 0) {
-            pressStart = 0;
-        }
+        pressStart = 0;
     }
 }
 
@@ -257,7 +275,7 @@ void handlePowerButton() {
                     // Обычное включение/выключение
                     powerOn = !powerOn;
                     coolingMode = false;
-                    fanWasActive = false;
+  
                     lastActivity = millis(); // Сбрасываем таймер авто-выключения
                     
                     if (powerOn) {
@@ -284,8 +302,8 @@ void handlePowerButton() {
 
 void checkCoolingMode() {
     if (coolingMode && currentTemp <= COOLING_TEMP) {
-        // Охлаждение завершено
         coolingMode = false;
+        coolingCompleted = true;  // ЗАПОМНИЛИ: остывание завершено
         analogWrite(FAN_PWM_PIN, 0);
         beep(800, 200);
     }

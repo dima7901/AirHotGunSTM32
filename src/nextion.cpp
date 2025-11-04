@@ -1,5 +1,6 @@
 #include "nextion.h"
 
+
 void NextionSendNum(const char* var, int value) {
     Serial1.print(var);
     Serial1.print(".val=");
@@ -7,20 +8,24 @@ void NextionSendNum(const char* var, int value) {
     Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
 }
 
-void NextionSendCommand(const char* cmd) {
-    Serial1.print(cmd);
-    Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
+void NEXTION_SendCommand(const char *string) {
+    Serial1.print(string);
+    Serial1.write(0xFF);
+    Serial1.write(0xFF);
+    Serial1.write(0xFF);
 }
 
-void NextionSendString(const char* var, const char* str) {
-    Serial1.print(var);
-    Serial1.print(".txt=\"");
-    Serial1.print(str);
-    Serial1.print("\"");
-    Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
+void NextionSendString(const char *ID, const char *string) {
+    char buf[50];
+    int len = snprintf(buf, sizeof(buf), "%s.txt=\"%s\"", ID, string);
+    Serial1.write((const uint8_t *)buf, len);
+    Serial1.write(0xFF);
+    Serial1.write(0xFF);
+    Serial1.write(0xFF);
 }
 
 void NextionRefresh() {
+    NextionSendString("FWver", FirmwareVersion);
     NextionSendNum("currentTemp", currentTemp);
     NextionSendNum("setTemp", setTemp);
     NextionSendNum("fanSpeed", fanPercent);
