@@ -58,6 +58,7 @@ void setup() {
     gerkonDebounced = gerkonRaw;
     gerkonPending = false;
     handToolInHand = gerkonDebounced;
+    
 }
 
 void loop() {
@@ -81,6 +82,7 @@ void loop() {
         handleEncoderButton();
         handlePresets();
         checkAutoPowerOff();
+        checkPage();
         lastControlUpdate = now;
     }
 
@@ -95,6 +97,7 @@ void loop() {
     static uint32_t lastPeripheralUpdate = 0;
     if (now - lastPeripheralUpdate > 50) {
         updateFan();
+        updateFanAnimation();
         updatePowerLED();
         checkCoolingMode();
         lastPeripheralUpdate = now;
@@ -127,6 +130,7 @@ if (currentTemp > HOT_CUTOFF) {
     // ДИСПЛЕЙ (5 Гц - чтобы не нагружать)
     static uint32_t lastDisplay = 0;
     if (now - lastDisplay > 200) {
+        speedAnimate();
         NextionRefresh();
         lastDisplay = now;
     }

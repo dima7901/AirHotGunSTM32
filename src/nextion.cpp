@@ -8,7 +8,7 @@ void NextionSendNum(const char* var, int value) {
     Serial1.write(0xFF); Serial1.write(0xFF); Serial1.write(0xFF);
 }
 
-void NEXTION_SendCommand(const char *string) {
+void NextionSendCommand(const char *string) {
     Serial1.print(string);
     Serial1.write(0xFF);
     Serial1.write(0xFF);
@@ -25,10 +25,13 @@ void NextionSendString(const char *ID, const char *string) {
 }
 
 void NextionRefresh() {
-    NextionSendString("FWver", FirmwareVersion);
+    NextionSendString("Fw", FirmwareVersion);
+   
     NextionSendNum("currentTemp", currentTemp);
     NextionSendNum("setTemp", setTemp);
+    NextionSendNum("adcFan", fanPWMValue);
     NextionSendNum("fanSpeed", fanPercent);
+    NextionSendNum("cnt", animationInterval);
     NextionSendNum("menu", menu);
     NextionSendNum("editparam", editParam);
     NextionSendNum("preset_mode", presetEditMode ? activePreset + 1 : 0);

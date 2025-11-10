@@ -41,6 +41,7 @@
 // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
 extern const char* FirmwareVersion;
 extern bool powerOn;
+extern bool pageFL;
 extern bool handToolInHand;
 extern uint32_t lastActivity;
 
@@ -48,6 +49,7 @@ extern int16_t currentTemp;
 extern int16_t setTemp;
 extern int16_t rawAdc;
 extern uint8_t fanPercent;
+extern uint8_t fanPWMValue;
 
 extern bool gerkonDebounced;      
 extern bool gerkonRaw;            
@@ -56,7 +58,8 @@ extern uint32_t gerkonDebounceTime;
 extern bool heaterHasBeenActiveSinceShutdown;
 extern bool coolingCompleted;
 extern bool hasCooledBelowThreshold;
-
+extern int16_t animationInterval;
+extern bool animatFL;
 struct Preset {
     int16_t temp;
     uint8_t fan;

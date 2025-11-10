@@ -13,6 +13,16 @@ void beep(uint16_t freq, uint16_t duration) {
     tone(BUZZER_PIN, freq, duration);
 }
 
+void checkPage() {
+    if (powerOn && pageFL == true) {
+    NextionSendCommand("page 1");
+    pageFL = false;
+} else if (!powerOn && !pageFL) {
+    NextionSendCommand("page 0");
+    pageFL = true;
+  }
+}
+
 void checkAutoPowerOff() {
     if (powerOn && !handToolInHand) {
         uint32_t now = millis();
@@ -24,7 +34,8 @@ void checkAutoPowerOff() {
             presetEditMode = false;
             activePreset = -1;
             updateHeater(0);
-            analogWrite(FAN_PWM_PIN, 0);
+            fanPWMValue = 0;
+            analogWrite(FAN_PWM_PIN, fanPWMValue);
             digitalWrite(POWER_LED_PIN, LOW);
             beep(600, 200);
             
@@ -68,45 +79,68 @@ void updateHeaterLogic() {
         updateHeater(0);
     }
 }
-
 void updateFan() {
     // Режим активного охлаждения (после выключения по кнопке POWER)
     if (coolingMode) {
-        analogWrite(FAN_PWM_PIN, 255);
+        fanPWMValue = 255;  // Сохраняем значение
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
         return;
     }
 
     // Рабочий режим: станция включена и фен в руках
     if (powerOn && handToolInHand) {
         hasCooledBelowThreshold = false; // Сброс при новом использовании
-        uint8_t fanSpeed = map(constrain(fanPercent, 30, 100), 0, 100, 80, 255);
-        analogWrite(FAN_PWM_PIN, fanSpeed);
+        fanPWMValue = map(constrain(fanPercent, 30, 100), 0, 100, 80, 255);
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
         return;
     }
 
     // Станция выключена — не включаем вентилятор вообще
     if (!powerOn) {
-        analogWrite(FAN_PWM_PIN, 0);
+        fanPWMValue = 0;  // Сохраняем значение
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
         return;
     }
 
     // Станция включена, но фен на базе (режим паузы)
     if (hasCooledBelowThreshold) {
         // Уже остывали до COOLING_TEMP — больше не включаем вентилятор
-        analogWrite(FAN_PWM_PIN, 0);
+        fanPWMValue = 0;  // Сохраняем значение
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
         return;
     }
 
     // Пока не остывали — включаем вентилятор, если горячо
     if (currentTemp > COOLING_TEMP) {
-        analogWrite(FAN_PWM_PIN, 255);
+        fanPWMValue = 255;  // Сохраняем значение
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
     } else {
         // Впервые достигли <= COOLING_TEMP — запоминаем навсегда
         hasCooledBelowThreshold = true;
-        analogWrite(FAN_PWM_PIN, 0);
+        fanPWMValue = 0;  // Сохраняем значение
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
     }
 }
-
+void updateFanAnimation() {
+    if (fanPWMValue == 0 && animatFL == true) {
+        animatFL = false;
+        NextionSendCommand("tm0.en=0");
+    } else if (fanPWMValue > 132 && animatFL == false) {
+        animatFL = true;
+        NextionSendCommand("tm0.en=1");
+    }
+}
+void speedAnimate() {
+        if (fanPWMValue >132 && fanPWMValue <= 170) {
+    animationInterval = 300;    
+    } else if (fanPWMValue > 170 && fanPWMValue <= 200) {
+     animationInterval = 200;
+    } else if (fanPWMValue > 200 && fanPWMValue <= 225) {
+      animationInterval = 100;  
+    } else if (fanPWMValue > 225 && fanPWMValue <= 255) {
+     animationInterval = 50;   
+    }
+}
 void updatePowerLED() {
     if (!powerOn) {
         digitalWrite(POWER_LED_PIN, LOW);
@@ -304,7 +338,8 @@ void checkCoolingMode() {
     if (coolingMode && currentTemp <= COOLING_TEMP) {
         coolingMode = false;
         coolingCompleted = true;  // ЗАПОМНИЛИ: остывание завершено
-        analogWrite(FAN_PWM_PIN, 0);
+        fanPWMValue = 0;
+        analogWrite(FAN_PWM_PIN, fanPWMValue);
         beep(800, 200);
     }
 }
@@ -431,6 +466,7 @@ void handleEncoderButton() {
             // Длительное удержание - переход в меню
             menu = 1;
             beep(3000, 100);
+            NextionSendCommand("page 2");
             lastActivity = now; // Сбрасываем таймер авто-выключения
             encoderPressStart = 0;
         } else if (holdTime > HOLD_TIME_SHORT_MS && (menu == 1 || menu == 2)) {
@@ -439,6 +475,7 @@ void handleEncoderButton() {
             //savePresets();
             lastActivity = now; // Сбрасываем таймер авто-выключения
             beep(2000, 100);
+            NextionSendCommand("page 1");
             encoderPressStart = 0;
         }
     }

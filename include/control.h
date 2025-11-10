@@ -24,4 +24,7 @@ void handlePresets();
 void handleGercon();
 void checkAutoPowerOff();
 void checkCoolingMode();
+void updateFanAnimation();
+void speedAnimate();
+void checkPage();
 #endif

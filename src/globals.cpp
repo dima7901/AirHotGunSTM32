@@ -1,7 +1,7 @@
 #include "globals.h"
 
 // Инициализация глобальных переменных
-const char* FirmwareVersion = "1.0.0";
+const char* FirmwareVersion = "1.0.2";
 bool powerOn = false;
 bool handToolInHand = false;
 uint32_t lastActivity = 0;
@@ -18,6 +18,10 @@ uint32_t gerkonDebounceTime = 0;
 bool heaterHasBeenActiveSinceShutdown = false;
 bool coolingCompleted = false;
 bool hasCooledBelowThreshold = false;
+uint8_t fanPWMValue = 0;
+int16_t animationInterval = 50;
+bool animatFL = true;
+bool pageFL = false;
 
 Preset presets[NUM_PRESETS] = {
     {250, 60},
